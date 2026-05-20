@@ -1,0 +1,8 @@
+python-dotenv
+pydantic
+imap-tools
+openpyxl
+pandas
+playwright
+httpx
+tenacity

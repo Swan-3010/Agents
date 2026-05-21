@@ -36,3 +36,12 @@
 - проверить Playwright;
 - сохранить тестовый XLSX;
 - собрать первый smoke workflow.
+
+## Версия
+
+**bootstrap-v0.1.0** — первичная инициализация проекта.
+
+- Scaffold структуры директорий (agents, app, docs, scripts, tools)
+- Базовая конфигурация Docker Compose
+- Шаблон .env.example
+- Список зависимостей requirements.txt

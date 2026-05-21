@@ -4,13 +4,12 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 from .contracts import MailMessage
 
 logger = logging.getLogger(__name__)
 
-# Действие — строковой тег: 'receipt', 'inquiry', 'skip', ...
 Action = str
 
 
@@ -20,7 +19,7 @@ class DispatchRule:
     name: str
     predicate: Callable[[MailMessage], bool]
     action: Action
-    priority: int = 0  # больше — выше
+    priority: int = 0
 
 
 class Dispatcher:
@@ -29,20 +28,13 @@ class Dispatcher:
     def __init__(self) -> None:
         self._rules: List[DispatchRule] = self._default_rules()
 
-    # ------------------------------------------------------------------
-    # Public
-    # ------------------------------------------------------------------
-
     def dispatch(self, msg: MailMessage) -> Action:
-        """Return action string for the given message."""
         for rule in sorted(self._rules, key=lambda r: -r.priority):
             try:
                 if rule.predicate(msg):
                     logger.debug(
                         "[Dispatcher] rule=%s action=%s subject=%r",
-                        rule.name,
-                        rule.action,
-                        msg.subject,
+                        rule.name, rule.action, msg.subject,
                     )
                     return rule.action
             except Exception as exc:  # noqa: BLE001
@@ -52,20 +44,28 @@ class Dispatcher:
     def add_rule(self, rule: DispatchRule) -> None:
         self._rules.append(rule)
 
-    # ------------------------------------------------------------------
-    # Default rules
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _default_rules() -> List[DispatchRule]:
         return [
             DispatchRule(
                 name="receipt_subject",
                 predicate=lambda m: bool(
-                    re.search(r"\u0447ек|receipt|order|\u0437аказ", m.subject, re.IGNORECASE)
+                    re.search(
+                        r"чек|receipt|order|заказ",
+                        m.subject,
+                        re.IGNORECASE,
+                    )
                 ),
                 action="process_receipt",
                 priority=10,
+            ),
+            DispatchRule(
+                name="receipt_sender",
+                predicate=lambda m: bool(
+                    re.search(r"check\.yandex\.ru|noreply@check", m.sender, re.IGNORECASE)
+                ),
+                action="process_receipt",
+                priority=15,
             ),
             DispatchRule(
                 name="no_reply",
@@ -76,7 +76,7 @@ class Dispatcher:
             ),
             DispatchRule(
                 name="empty_body",
-                predicate=lambda m: not m.body.strip(),
+                predicate=lambda m: not (m.body_text or "").strip(),
                 action="skip",
                 priority=1,
             ),

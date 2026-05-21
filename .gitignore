@@ -34,3 +34,20 @@ test-results/
 Thumbs.db
 .vscode/
 .idea/
+
+# Pytest / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# Build / dist
+dist/
+build/
+*.egg-info/

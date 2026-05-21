@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import List
 
 from .contracts import AgentRunResult, MailMessage
@@ -46,42 +48,49 @@ class YandexMailAgent:
         self._dispatcher = Dispatcher()
         self._responder = Responder(self.config)
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def run(self) -> AgentRunResult:
-        """Один цикл обработки: fetch → parse → dispatch → respond."""
-        logger.info("[Agent] run() started — mailbox=%s", self.config.mailbox)
+        """Один цикл: fetch → parse → dispatch → respond."""
+        run_id = str(uuid.uuid4())
+        started_at = datetime.now(tz=timezone.utc)
+        logger.info("[Agent] run() started run_id=%s mailbox=%s", run_id, self.config.mailbox)
 
+        errors: List[str] = []
         raw_messages = self._fetcher.fetch(limit=self.config.max_fetch)
         logger.info("[Agent] fetched %d raw messages", len(raw_messages))
 
-        messages: List[MailMessage] = [
-            self._parser.parse(raw) for raw in raw_messages
-        ]
+        messages: List[MailMessage] = []
+        for raw in raw_messages:
+            try:
+                messages.append(self._parser.parse(raw))
+            except Exception as exc:  # noqa: BLE001
+                logger.error("[Agent] parse error: %s", exc)
+                errors.append(str(exc))
 
-        processed: List[MailMessage] = []
-        skipped: List[MailMessage] = []
-
+        receipts_parsed = 0
         for msg in messages:
-            action = self._dispatcher.dispatch(msg)
-            if action == "skip":
-                skipped.append(msg)
-                continue
-            if not self.config.dry_run:
-                self._responder.respond(msg, action)
-            processed.append(msg)
+            try:
+                action = self._dispatcher.dispatch(msg)
+                if action == "skip":
+                    continue
+                if action == "process_receipt":
+                    receipts_parsed += 1
+                if not self.config.dry_run:
+                    self._responder.respond(msg, action)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("[Agent] dispatch/respond error: %s", exc)
+                errors.append(str(exc))
 
+        finished_at = datetime.now(tz=timezone.utc)
         result = AgentRunResult(
-            total=len(messages),
-            processed=len(processed),
-            skipped=len(skipped),
-            errors=[],
+            run_id=run_id,
+            started_at=started_at,
+            finished_at=finished_at,
+            messages_fetched=len(raw_messages),
+            receipts_parsed=receipts_parsed,
+            errors=errors,
         )
-        logger.info("[Agent] run() finished — %s", result)
+        logger.info("[Agent] run() finished: %s", result)
         return result
 
     def run_once(self) -> AgentRunResult:
-        """Алиас run() для CLI/cron."""
         return self.run()

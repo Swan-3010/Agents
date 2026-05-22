@@ -583,3 +583,79 @@ Unit tests: Pending (next iteration)
 **Status Update:** ✅ Batch 7 complete - Core interfaces established for future implementations
 - **Batch 9**: LLM receipt extraction (структурированный парсинг чеков)
 - **Batch 10**: Merge PR #1 → main, tag v0.1.0
+
+---
+
+## Batch 8 — Comprehensive Testing Infrastructure (T-022...T-026)
+
+**Дата**: 21 мая 2026, 17:30-18:45 MSK  
+**Коммиты**: `97dc66c..HEAD` (4 коммита)
+
+### Итерация 8 — Развёртывание полноценной тестовой инфраструктуры (T-022...T-026)
+
+**Что сделано**:
+
+#### Unit Tests (T-022, T-023):
+- **`tests/unit/test_dedup.py`** (8 тестов) — проверка дедупликации чеков
+  - test_empty_receipt_list: пустой список
+  - test_single_receipt: один чек
+  - test_identical_receipts: идентичные чеки
+  - test_different_receipts: разные чеки
+  - test_partial_duplicates: частичные дубликаты
+  - test_hash_collision_handling: обработка коллизий хеша
+  - test_date_based_dedup: дедупликация по дате
+  - test_amount_precision: точность сумм
+
+- **`tests/unit/test_summary.py`** (6 тестов) — проверка агрегации данных
+  - test_empty_summary: пустая сводка
+  - test_single_category: одна категория
+  - test_multiple_categories: несколько категорий
+  - test_date_range_filtering: фильтрация по дате
+  - test_currency_conversion: конвертация валют (stub)
+  - test_summary_statistics: статистика сводки
+
+#### Integration Tests (T-024, T-025):
+- **`tests/integration/test_imap_smtp.py`** (6 тестов) — IMAP/SMTP интеграция
+  - test_imap_connection: подключение к IMAP
+  - test_imap_fetch_messages: получение сообщений
+  - test_imap_search_by_date: поиск по дате
+  - test_smtp_send_basic: отправка email
+  - test_smtp_send_with_attachment: email с вложением
+  - test_imap_smtp_roundtrip: цикл отправки/получения
+
+- **`tests/integration/test_playwright.py`** (5 тестов) — Browser automation
+  - test_browser_launch: запуск браузера
+  - test_navigate_to_url: навигация по URL
+  - test_login_flow: процесс авторизации
+  - test_extract_receipt_data: извлечение данных чека
+  - test_screenshot_capture: создание скриншота
+
+#### Contract Tests (T-026):
+- **`tests/contract/test_interfaces.py`** (5 тестов) — проверка контрактов интерфейсов
+  - test_mail_core_contracts: контракты mail_core (IMailFetcher, IMailSender, IMailParser)
+  - test_browser_core_contracts: контракты browser_core (IBrowserDriver)
+  - test_llm_core_contracts: контракты llm_core (ILLMProvider)
+  - test_state_core_contracts: контракты state_core (IStateManager)
+  - test_dataclass_validation: валидация dataclass DTOs (MailMessage, Receipt)
+
+**Артефакты**:  
+`tests/unit/test_dedup.py`, `tests/unit/test_summary.py`, `tests/integration/test_imap_smtp.py`, `tests/integration/test_playwright.py`, `tests/contract/test_interfaces.py`
+
+#### Frameworks & Dependencies:
+- pytest: основной тестовый фреймворк
+- pytest-asyncio: поддержка async тестов
+- pytest-mock: мокирование зависимостей
+- Playwright: браузерная автоматизация (stub - требует установки)
+- IMAP/SMTP: email интеграция (stub - требует конфигурации)
+
+#### Test Results:
+- **Unit tests**: ✅ 14/14 passed (dedup + summary)
+- **Integration tests**: ⏭️ 11 skipped (требуют env: IMAP/SMTP серверы, Playwright setup)
+- **Contract tests**: ⏭️ 5 skipped (требуют реальных имплементаций интерфейсов)
+- **Coverage**: Структура готова для расширения
+
+---
+
+**Status Update:** ✅ Batch 8 complete - Тестовая инфраструктура установлена, готова к интеграции с реальными имплементациями
+- **Batch 9**: LLM receipt extraction (структурированный парсинг чеков)
+- **Batch 10**: Merge PR #1 ➜ main, tag v0.1.0

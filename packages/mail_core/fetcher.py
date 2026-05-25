@@ -258,3 +258,6 @@ if __name__ == '__main__':
             print("\n" + "=" * 60)
             print("❌ SMOKE TEST FAILED: Ссылка не найдена")
             print("=" * 60)
+
+# Алиас для обратной совместимости с Batch 9
+ImapReceiptFetcher = YandexMailFetcher

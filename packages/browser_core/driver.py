@@ -3,7 +3,7 @@
 import logging
 import os
 from typing import Optional
-from playwright.sync_api import sync_playwright, Browser, Page, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright, Browser, Page
 
 logger = logging.getLogger(__name__)
 
@@ -14,19 +14,17 @@ class ReceiptBrowserDriver:
     Поддерживает Google Chrome, Chromium и Playwright-браузеры.
     """
     
-    def __init__(self, headless: bool = True, timeout: int = 30000):
+    def __init__(self, headless: bool = True):
         """Инициализация драйвера.
         
         Args:
             headless: Запускать браузер в headless режиме
-            timeout: Таймаут операций в миллисекундах
         """
         self.headless = headless
-        self.timeout = timeout
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
-        logger.info(f"ReceiptBrowserDriver initialized (headless={headless}, timeout={timeout}ms)")
+        logger.info(f"ReceiptBrowserDriver initialized (headless={headless})")
     
     def __enter__(self):
         """Context manager entry."""
@@ -64,7 +62,6 @@ class ReceiptBrowserDriver:
                 self.browser = self.playwright.chromium.launch(headless=self.headless)
             
             self.page = self.browser.new_page()
-            self.page.set_default_timeout(self.timeout)
             logger.info("Браузер успешно запущен")
             
         except Exception as e:
@@ -108,9 +105,9 @@ class ReceiptBrowserDriver:
             logger.info(f"Открываем URL: {url}")
             
             if wait_for_load:
-                self.page.goto(url, wait_until='networkidle', timeout=self.timeout)
+                self.page.goto(url, wait_until='networkidle', timeout=30000)
             else:
-                self.page.goto(url, timeout=self.timeout)
+                self.page.goto(url, timeout=30000)
             
             html_content = self.page.content()
             logger.info(f"Страница загружена, размер HTML: {len(html_content)} bytes")

@@ -1,83 +1,63 @@
 """Dispatcher — маршрутизация писем по правилам."""
 from __future__ import annotations
 
-import logging
-import re
-from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 
-from .contracts import MailMessage
-
-logger = logging.getLogger(__name__)
-
-Action = str
+from packages.mail_core.parser import ReceiptParser
 
 
-@dataclass
-class DispatchRule:
-    """Rule: если predicate(письмо) == True → вернуть action."""
-    name: str
-    predicate: Callable[[MailMessage], bool]
-    action: Action
-    priority: int = 0
+@dataclass(slots=True)
+class DispatchDecision:
+    should_process: bool
+    reason: str
+    message_id: str | None = None
 
 
+@dataclass(slots=True)
 class Dispatcher:
-    """Проходит по правилам и возвращает action для письма."""
+    receipt_parser: ReceiptParser | None = None
 
-    def __init__(self) -> None:
-        self._rules: List[DispatchRule] = self._default_rules()
+    def __post_init__(self) -> None:
+        if self.receipt_parser is None:
+            self.receipt_parser = ReceiptParser()
 
-    def dispatch(self, msg: MailMessage) -> Action:
-        for rule in sorted(self._rules, key=lambda r: -r.priority):
-            try:
-                if rule.predicate(msg):
-                    logger.debug(
-                        "[Dispatcher] rule=%s action=%s subject=%r",
-                        rule.name, rule.action, msg.subject,
-                    )
-                    return rule.action
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("[Dispatcher] rule=%s error: %s", rule.name, exc)
-        return "skip"
+    def should_process(
+        self,
+        msg: Any,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> bool:
+        return self.receipt_parser.should_process(
+            msg=msg,
+            since=since,
+            until=until,
+        )
 
-    def add_rule(self, rule: DispatchRule) -> None:
-        self._rules.append(rule)
+    def dispatch(
+        self,
+        msg: Any,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> DispatchDecision:
+        approved = self.should_process(
+            msg,
+            since=since,
+            until=until,
+        )
 
-    @staticmethod
-    def _default_rules() -> List[DispatchRule]:
-        return [
-            DispatchRule(
-                name="receipt_subject",
-                predicate=lambda m: bool(
-                    re.search(
-                        r"чек|receipt|order|заказ",
-                        m.subject,
-                        re.IGNORECASE,
-                    )
-                ),
-                action="process_receipt",
-                priority=10,
-            ),
-            DispatchRule(
-                name="receipt_sender",
-                predicate=lambda m: bool(
-                    re.search(r"check\.yandex\.ru|noreply@check", m.sender, re.IGNORECASE)
-                ),
-                action="process_receipt",
-                priority=15,
-            ),
-            DispatchRule(
-                name="no_reply",
-                predicate=lambda m: "no-reply" in m.sender.lower()
-                or "noreply" in m.sender.lower(),
-                action="skip",
-                priority=5,
-            ),
-            DispatchRule(
-                name="empty_body",
-                predicate=lambda m: not (m.body_text or "").strip(),
-                action="skip",
-                priority=1,
-            ),
-        ]
+        if not approved:
+            return DispatchDecision(
+                should_process=False,
+                reason="filtered_by_receipt_parser",
+                message_id=getattr(msg, "uid", None) or getattr(msg, "message_id", None),
+            )
+
+        return DispatchDecision(
+            should_process=True,
+            reason="approved_by_receipt_parser",
+            message_id=getattr(msg, "uid", None) or getattr(msg, "message_id", None),
+        )

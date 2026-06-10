@@ -53,11 +53,17 @@ class Dispatcher:
             return DispatchDecision(
                 should_process=False,
                 reason="filtered_by_receipt_parser",
-                message_id=getattr(msg, "uid", None) or getattr(msg, "message_id", None),
+                message_id=self._extract_message_id(msg),
             )
 
         return DispatchDecision(
             should_process=True,
             reason="approved_by_receipt_parser",
-            message_id=getattr(msg, "uid", None) or getattr(msg, "message_id", None),
+            message_id=self._extract_message_id(msg),
         )
+
+    @staticmethod
+    def _extract_message_id(msg: Any) -> str | None:
+        if isinstance(msg, dict):
+            return msg.get("uid") or msg.get("message_id")
+        return getattr(msg, "uid", None) or getattr(msg, "message_id", None)

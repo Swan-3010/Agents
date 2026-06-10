@@ -1,5 +1,25 @@
 # RELEASE NOTES — Agents (Yandex Receipt Agent)
 
+---
+
+## 10 июня 2026 — T-031: imap-tools refactor (feature/imap-tools-refactor)
+
+### mail_core — переход на imap-tools и Pydantic-модели
+**Ветка:** `feature/imap-tools-refactor`  
+**Коммиты:** 5 (feat(T-031) batch)
+
+**Что сделано:**
+- `pyproject.toml`: добавлена зависимость `imap-tools>=1.5`
+- - `packages/mail_core/__init__.py`: публичный API пакета + алиасы обратной совместимости (`YandexMailFetcher`, `ImapReceiptFetcher` → `MailClient`)
+  - - `packages/mail_core/models.py`: Pydantic v2 модели `ParsedEmail`, `Attachment`, `Address`, `FetchConfig` — единый внутренний DTO для всех нижестоящих модулей
+    - - `packages/mail_core/parser.py`: `ReceiptParser` — stateless-экстрактор OFD-ссылок из тела письма (text/html), обогащает `ParsedEmail`
+      - - `packages/mail_core/mail_client.py`: `MailClient` на базе `imap_tools.MailBox` — заменяет ручной `imaplib`-слой в `fetcher.py`. Поддерживает context manager, `FetchConfig`-фильтрацию, возвращает `ParsedEmail`
+       
+        - **Ключевые решения:**
+        - - `fetcher.py` сохранён для обратной совместимости; алиас `ImapReceiptFetcher = MailClient` в `__init__.py`
+          - - `contracts.py` сохранён; новый `models.py` не конфликтует — разные имена классов
+            - - Весь ручной MIME-парсинг (`_get_email_body`, `_decode_header`) убран: `imap_tools` делает это автоматически
+
 > История разработки проекта: ключевые коммиты, выполненные батчи, функции, паттерны, результаты тестирования.
 
 ---

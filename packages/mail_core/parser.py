@@ -1,70 +1,47 @@
-"""mail_core.parser - Receipt URL extractor.
-
-Takes a ParsedEmail and enriches it with:
-  - receipt_url  : first matching OFD/receipt URL found in body_text or body_html
-  - receipt_sender: normalised sender address
-
-Task: T-031 (imap-tools refactor)
-Epic: E-04 - Core Interfaces
-"""
-
 from __future__ import annotations
 
 import re
-from typing import Optional
+from dataclasses import dataclass
 
-from .models import ParsedEmail
-
-# ---------------------------------------------------------------------------
-# Known OFD / receipt URL patterns (ordered by specificity)
-# ---------------------------------------------------------------------------
-_RECEIPT_PATTERNS: list[str] = [
-    r"https?://ofd\.ru/r/[\w\-]+",
-    r"https?://check\.ofd\.ru/[\w\-/]+",
-    r"https?://consumer\.rnko\.ru/[\w\-/]+",
-    r"https?://lk\.platformaofd\.ru/[\w\-/]+",
-    r"https?://[\w\.-]+/[\w\-/]*(?:check|receipt|\u0447\u0435\u043a)[\w\-/]*",
-]
-
-_COMPILED = [re.compile(p, re.IGNORECASE) for p in _RECEIPT_PATTERNS]
+from .rules import MailSelectionRules, is_receipt_candidate, load_mail_selection_rules
 
 
+OFD_URL_RE = re.compile(
+    r"https?://[^\s\"'<>]+",
+    re.IGNORECASE,
+)
+
+
+@dataclass(slots=True)
 class ReceiptParser:
-    """Stateless parser: enriches a ParsedEmail with receipt metadata."""
+    rules: MailSelectionRules | None = None
 
-    def enrich(self, msg: ParsedEmail) -> ParsedEmail:
-        """Return the same ParsedEmail object with receipt_url / receipt_sender filled.
+    def __post_init__(self) -> None:
+        if self.rules is None:
+            self.rules = load_mail_selection_rules()
 
-        Args:
-            msg: ParsedEmail produced by MailClient.
-
-        Returns:
-            The same object, mutated in-place (receipt_url, receipt_sender set).
-        """
-        msg.receipt_url = self._extract_url(msg.body_text) or self._extract_url(
-            msg.body_html
+    def is_receipt_email(
+        self,
+        *,
+        subject: str | None,
+        sender: str | None,
+        body_text: str | None,
+        body_html: str | None,
+    ) -> bool:
+        return is_receipt_candidate(
+            subject=subject,
+            sender=sender,
+            body_text=body_text,
+            body_html=body_html,
+            rules=self.rules,
         )
-        if msg.from_addr:
-            msg.receipt_sender = msg.from_addr.email.lower()
-        return msg
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _extract_url(text: str) -> Optional[str]:
-        """Scan *text* and return the first receipt URL found, or None."""
-        if not text:
+    def extract_first_receipt_link(self, content: str | None) -> str | None:
+        if not content:
             return None
-        for pattern in _COMPILED:
-            m = pattern.search(text)
-            if m:
-                return m.group(0)
-        return None
 
-    # Convenience class-method for one-shot use
-    @classmethod
-    def extract_from_text(cls, text: str) -> Optional[str]:
-        """Extract a receipt URL directly from a text string (no ParsedEmail needed)."""
-        return cls._extract_url(text)
+        for match in OFD_URL_RE.findall(content):
+            if any(domain in match.lower() for domain in self.rules.body_domains):
+                return match
+
+        return None

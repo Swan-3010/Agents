@@ -2,6 +2,30 @@
 
 ---
 
+## 10 июня 2026 — T-038: Dispatcher + ReceiptParser integration (feature/dispatcher-integration)
+
+### Dispatcher интегрирован с реальным ReceiptParser
+**Ветка:** `feature/dispatcher-integration`
+**Коммиты:** 2
+**Статус:** ✅ MERGED → main (10 июня 2026, PR #10)
+**Тесты:** 10 passed (unit + integration)
+
+**Что сделано:**
+- `tests/unit/test_dispatcher.py` — переписан под `ParsedEmail` + реальный `ReceiptParser`
+  - `TestDispatcherWithRealParser` (8 тестов) — subject RU/EN, даты, отсутствие парсера
+  - `TestDispatcherCustomRule` (2 теста) — обратная совместимость custom rules
+- `tests/integration/test_smoke_orchestrator_mail_gate.py` — добавлены реальные тесты:
+  - `test_orchestrator_with_real_parser_filters_correctly` — фильтрация по subject
+  - `test_orchestrator_real_parser_date_filter` — фильтрация чеков по дате
+  - `test_orchestrator_processes_only_parser_approved_messages` — legacy мок (сохранён)
+
+**Соответствие ТЗ:**
+- АС-02: фильтрация писем по теме и дате
+- АС-03: проверка прохождения через диспетчер на реальных данных
+
+---
+
+
 ## 10 июня 2026 — T-037: mail parsing under TZ (feature/mail-parsing)
 
 ### ReceiptParser — subject/date фильтры + тесты

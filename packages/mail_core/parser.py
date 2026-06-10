@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """mail_core.parser - Receipt URL extractor + mail filters.
 
 Takes a ParsedEmail and enriches it with:
@@ -34,14 +33,6 @@ _RECEIPT_PATTERNS: list[str] = [
 ]
 
 _COMPILED = [re.compile(p, re.IGNORECASE) for p in _RECEIPT_PATTERNS]
-=======
-from __future__ import annotations
-
-import re
-from dataclasses import dataclass
-
-from .rules import MailSelectionRules, is_receipt_candidate, load_mail_selection_rules
->>>>>>> origin/main
 
 # ---------------------------------------------------------------------------
 # Subject keywords that indicate a receipt/payment email
@@ -64,17 +55,9 @@ _SUBJECT_RE = re.compile(
 )
 
 
-OFD_URL_RE = re.compile(
-    r"https?://[^\s\"'<>]+",
-    re.IGNORECASE,
-)
-
-
-@dataclass(slots=True)
 class ReceiptParser:
-    rules: MailSelectionRules | None = None
+    """Stateless parser: enriches a ParsedEmail with receipt metadata."""
 
-<<<<<<< HEAD
     # ------------------------------------------------------------------
     # OFD URL extraction
     # ------------------------------------------------------------------
@@ -169,34 +152,3 @@ class ReceiptParser:
         if msg.date and not self.is_within_date_range(msg.date, since, until):
             return False
         return True
-=======
-    def __post_init__(self) -> None:
-        if self.rules is None:
-            self.rules = load_mail_selection_rules()
-
-    def is_receipt_email(
-        self,
-        *,
-        subject: str | None,
-        sender: str | None,
-        body_text: str | None,
-        body_html: str | None,
-    ) -> bool:
-        return is_receipt_candidate(
-            subject=subject,
-            sender=sender,
-            body_text=body_text,
-            body_html=body_html,
-            rules=self.rules,
-        )
-
-    def extract_first_receipt_link(self, content: str | None) -> str | None:
-        if not content:
-            return None
-
-        for match in OFD_URL_RE.findall(content):
-            if any(domain in match.lower() for domain in self.rules.body_domains):
-                return match
-
-        return None
->>>>>>> origin/main

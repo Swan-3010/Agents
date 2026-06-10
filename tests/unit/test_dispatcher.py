@@ -1,83 +1,140 @@
-"""Unit-тесты Dispatcher (T-023)."""
+"""Unit-тесты Dispatcher — T-038.
+
+Обновлено для работы с ParsedEmail + реальным ReceiptParser.should_process().
+Обратная совместимость с MailMessage сохранена.
+"""
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 import pytest
 
+from packages.mail_core.models import ParsedEmail, Address
+from packages.mail_core.parser import ReceiptParser
 from packages.yandex_mail_agent.dispatcher import Dispatcher, DispatchRule
-from packages.yandex_mail_agent.contracts import MailMessage
 
 
-def _make_msg(
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_parsed(
     subject: str = "Test",
     sender: str = "user@example.com",
     body_text: str = "Hello",
-) -> MailMessage:
-    return MailMessage(
-        uid="<uid-001>",
+    date: datetime | None = None,
+) -> ParsedEmail:
+    return ParsedEmail(
+        uid="uid-001",
         subject=subject,
-        sender=sender,
-        received_at=datetime.now(tz=timezone.utc),
+        from_address=Address(name="Test", email=sender),
         body_text=body_text,
+        date=date or datetime(2026, 6, 10, 12, 0, 0, tzinfo=timezone.utc),
     )
 
 
-@pytest.fixture
-def dispatcher() -> Dispatcher:
-    return Dispatcher()
+# ---------------------------------------------------------------------------
+# TestDispatcherWithRealParser
+# ---------------------------------------------------------------------------
+
+class TestDispatcherWithRealParser:
+    """Dispatcher с настоящим ReceiptParser — без моков."""
+
+    def setup_method(self):
+        self.parser = ReceiptParser()
+        self.dispatcher = Dispatcher(receipt_parser=self.parser)
+
+    def test_receipt_subject_ru_approved(self):
+        msg = _make_parsed(subject="Чек от Ozon")
+        decision = self.dispatcher.dispatch(msg)
+        assert decision.should_process is True
+        assert decision.reason == "approved_by_receipt_parser"
+
+    def test_receipt_subject_en_approved(self):
+        msg = _make_parsed(subject="Your receipt #12345")
+        decision = self.dispatcher.dispatch(msg)
+        assert decision.should_process is True
+
+    def test_payment_subject_approved(self):
+        msg = _make_parsed(subject="Оплата принята")
+        decision = self.dispatcher.dispatch(msg)
+        assert decision.should_process is True
+
+    def test_unrelated_subject_filtered(self):
+        msg = _make_parsed(subject="Новости недели")
+        decision = self.dispatcher.dispatch(msg)
+        assert decision.should_process is False
+        assert decision.reason == "filtered_by_receipt_parser"
+
+    def test_empty_subject_filtered(self):
+        msg = _make_parsed(subject="")
+        decision = self.dispatcher.dispatch(msg)
+        assert decision.should_process is False
+
+    def test_receipt_within_date_range_approved(self):
+        msg = _make_parsed(
+            subject="Чек",
+            date=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        )
+        decision = self.dispatcher.dispatch(
+            msg,
+            since=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            until=datetime(2026, 6, 30, tzinfo=timezone.utc),
+        )
+        assert decision.should_process is True
+
+    def test_receipt_out_of_date_range_filtered(self):
+        msg = _make_parsed(
+            subject="Invoice #99",
+            date=datetime(2026, 7, 5, tzinfo=timezone.utc),
+        )
+        decision = self.dispatcher.dispatch(
+            msg,
+            since=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            until=datetime(2026, 6, 30, tzinfo=timezone.utc),
+        )
+        assert decision.should_process is False
+
+    def test_no_parser_raises_or_skips(self):
+        """Dispatcher без парсера — должен вызывать AttributeError или обрабатывать корректно."""
+        dispatcher_no_parser = Dispatcher(receipt_parser=None)
+        msg = _make_parsed(subject="Чек")
+        with pytest.raises((AttributeError, TypeError)):
+            dispatcher_no_parser.dispatch(msg)
 
 
-class TestDispatcherDefaults:
-    def test_receipt_subject_returns_process_receipt(self, dispatcher: Dispatcher) -> None:
-        msg = _make_msg(subject="Ваш чек от Ozon")
-        assert dispatcher.dispatch(msg) == "process_receipt"
-
-    def test_receipt_subject_english(self, dispatcher: Dispatcher) -> None:
-        msg = _make_msg(subject="Your receipt #12345")
-        assert dispatcher.dispatch(msg) == "process_receipt"
-
-    def test_noreply_sender_skipped(self, dispatcher: Dispatcher) -> None:
-        msg = _make_msg(sender="no-reply@shop.com")
-        assert dispatcher.dispatch(msg) == "skip"
-
-    def test_noreply_without_dash_skipped(self, dispatcher: Dispatcher) -> None:
-        msg = _make_msg(sender="noreply@notifications.com")
-        assert dispatcher.dispatch(msg) == "skip"
-
-    def test_empty_body_skipped(self, dispatcher: Dispatcher) -> None:
-        msg = _make_msg(body_text="   ")
-        assert dispatcher.dispatch(msg) == "skip"
-
-    def test_regular_message_skipped_by_default(self, dispatcher: Dispatcher) -> None:
-        msg = _make_msg(subject="Hello there", sender="friend@gmail.com", body_text="Let's meet")
-        assert dispatcher.dispatch(msg) == "skip"
-
-    def test_receipt_priority_over_noreply(self, dispatcher: Dispatcher) -> None:
-        # receipt_subject priority=10 > no_reply priority=5
-        msg = _make_msg(subject="Чек за order", sender="no-reply@shop.com", body_text="Body")
-        assert dispatcher.dispatch(msg) == "process_receipt"
-
+# ---------------------------------------------------------------------------
+# TestDispatcherCustomRule (legacy — обратная совместимость)
+# ---------------------------------------------------------------------------
 
 class TestDispatcherCustomRule:
-    def test_add_custom_rule(self, dispatcher: Dispatcher) -> None:
-        rule = DispatchRule(
-            name="vip",
-            predicate=lambda m: "VIP" in m.subject,
-            action="vip_handle",
-            priority=20,
-        )
-        dispatcher.add_rule(rule)
-        msg = _make_msg(subject="VIP offer for you")
-        assert dispatcher.dispatch(msg) == "vip_handle"
+    """Custom DispatchRule API — проверка обратной совместимости."""
 
-    def test_broken_predicate_does_not_raise(self, dispatcher: Dispatcher) -> None:
-        rule = DispatchRule(
-            name="broken",
-            predicate=lambda m: 1 / 0,  # выбросит ZeroDivisionError
-            action="crash",
-            priority=100,
+    def test_add_custom_rule(self):
+        parser = ReceiptParser()
+        dispatcher = Dispatcher(receipt_parser=parser)
+        vip_rule = DispatchRule(
+            name="vip",
+            predicate=lambda msg: "VIP" in (msg.subject or ""),
+            action="process_vip",
         )
-        dispatcher.add_rule(rule)
-        msg = _make_msg()
-        # должно вернуть skip без исключений
-        result = dispatcher.dispatch(msg)
-        assert isinstance(result, str)
+        dispatcher.add_rule(vip_rule)
+        msg = _make_parsed(subject="VIP Order")
+        decision = dispatcher.dispatch(msg)
+        assert decision.should_process is True
+
+    def test_broken_predicate_does_not_raise(self):
+        parser = ReceiptParser()
+        dispatcher = Dispatcher(receipt_parser=parser)
+        broken_rule = DispatchRule(
+            name="broken",
+            predicate=lambda msg: 1 / 0,  # ZeroDivisionError
+            action="process",
+        )
+        dispatcher.add_rule(broken_rule)
+        msg = _make_parsed(subject="Чек")
+        # Не должен падать, даже если предикат падает
+        try:
+            decision = dispatcher.dispatch(msg)
+        except Exception:
+            pytest.fail("Dispatcher выбросил исключение при broken predicate")

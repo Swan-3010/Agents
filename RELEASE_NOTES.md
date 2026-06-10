@@ -2,6 +2,28 @@
 
 ---
 
+## 10 июня 2026 — T-037: mail parsing under TZ (feature/mail-parsing)
+
+### ReceiptParser — subject/date фильтры + тесты
+**Ветка:** `feature/mail-parsing`
+**Коммиты:** 3 (feat + test + fix)
+**Статус:** ✅ MERGED → main (10 июня 2026, PR #9)
+**Тесты:** 32 passed, 37 skipped, 0 failed (`pytest tests/ -v --tb=short`)
+
+**Что сделано:**
+- `packages/mail_core/parser.py`: добавлены методы `ReceiptParser`
+  - `subject_matches_receipt(subject)` — фильтр по теме (RU+EN: чек, оплата, покупка, receipt, invoice, payment...)
+  - `is_within_date_range(dt, since, until)` — фильтр по дате, naive datetime → UTC
+  - `should_process(msg, since, until)` — комбинированный гейт для диспетчера
+- `packages/mail_core/tests/test_receipt_parser.py`: 27 unit-тестов
+  - `TestExtractFromText` (8 тестов) — OFD URL из text/html
+  - `TestSubjectMatchesReceipt` (9 тестов) — RU/EN ключевые слова
+  - `TestIsWithinDateRange` (7 тестов) — граничные значения since/until
+  - `TestShouldProcess` (5 тестов) — комбинированный гейт
+
+---
+
+
 ## 10 июня 2026 — T-031: imap-tools refactor (feature/imap-tools-refactor)
 
 ### mail_core — переход на imap-tools и Pydantic-модели

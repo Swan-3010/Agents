@@ -31,6 +31,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+  "slow: marks slow tests",
+  "integration: marks integration tests",
+]
+
 
 [tool.ruff]
 line-length = 100

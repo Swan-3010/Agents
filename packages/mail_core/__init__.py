@@ -11,9 +11,9 @@ Backward-compat aliases:
 """
 
 from .mail_client import MailClient
-from .models import ParsedEmail, Attachment
+from .models import Address, Attachment, FetchConfig, ParsedEmail
 from .parser import ReceiptParser
-from .sender import EmailSender
+from .rules import MailSelectionRules, load_mail_selection_rules
 
 # Backward-compat aliases (Batch 9 contracts)
 YandexMailFetcher = MailClient
@@ -23,8 +23,9 @@ __all__ = [
     "MailClient",
     "ParsedEmail",
     "Attachment",
+    "Address",
+    "FetchConfig",
     "ReceiptParser",
-    "EmailSender",
-    "YandexMailFetcher",
-    "ImapReceiptFetcher",
+    "MailSelectionRules",
+    "load_mail_selection_rules",
 ]

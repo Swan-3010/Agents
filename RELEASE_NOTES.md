@@ -7,6 +7,8 @@
 ### mail_core — переход на imap-tools и Pydantic-модели
 **Ветка:** `feature/imap-tools-refactor`  
 **Коммиты:** 5 (feat(T-031) batch)
+**Статус:** ✅ MERGED → main (10 июня 2026, PR #8)
+**Тесты:** 32 passed, 37 skipped, 0 failed (`pytest tests/ -v --tb=short`)
 
 **Что сделано:**
 - `pyproject.toml`: добавлена зависимость `imap-tools>=1.5`
